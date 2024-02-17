@@ -15,7 +15,6 @@ import java.time.format.DateTimeFormatter;
 
 import javafx.application.Platform;
 
-import javafx.geometry.Pos;
 
 import java.io.*;
 import java.util.Iterator;
@@ -45,7 +44,7 @@ public class posjava extends Application {
     private TextField productPriceField;
 
     private ObservableList<String> allProducts;
-    private String filePath = "C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\javapos\\gst_item_name.csv";
+    private String filePath = "D:\\java software\\TEST1\\gst_item_name_dub.csv";
 
     public static void main(String[] args) {
         launch(args);
@@ -81,7 +80,6 @@ public class posjava extends Application {
         // Quantity Spinner
         Spinner<Integer> quantitySpinner = new Spinner<>(1, Integer.MAX_VALUE, 1);
         quantitySpinner.setEditable(true); // Allow manual input
-        
 
         // Buttons
         Button addToCartButton = new Button("Add to Cart");
@@ -101,34 +99,19 @@ public class posjava extends Application {
 
         // Layout
         BorderPane borderPane = new BorderPane();
-        HBox topBox = new HBox(searchTextField);
-        searchTextField.setPrefWidth(400);
-        
-        HBox leftButtons = new HBox(40, addNewProductButton, updateProductButton);
-        HBox.setMargin(leftButtons, new Insets(20, 10, 15, 80));
-        HBox rightButtons = new HBox(40, totalLabel, checkoutButton);
-        HBox.setMargin(rightButtons, new Insets(20, 80, 15, 10));
-        rightButtons.setAlignment(Pos.CENTER_RIGHT); 
-        
-        HBox bottomBox = new HBox(leftButtons, rightButtons);
-        HBox.setHgrow(leftButtons, javafx.scene.layout.Priority.ALWAYS);
-        bottomBox.setAlignment(Pos.CENTER_LEFT);
+        HBox topBox = new HBox(searchTextField, quantitySpinner);
+        HBox bottomBox = new HBox(10, addToCartButton, removeButton, addNewProductButton, updateProductButton, checkoutButton, totalLabel);
+        bottomBox.setPadding(new Insets(10));
 
         // VBox for the left side with productList and searchTextField
         VBox leftVBox = new VBox(productList, topBox);
-        VBox centerVBox = new VBox(60, quantitySpinner, addToCartButton, removeButton);
-        centerVBox.setAlignment(Pos.CENTER);
         leftVBox.setSpacing(10);
 
         borderPane.setLeft(leftVBox);
-        borderPane.setCenter(centerVBox);
-        borderPane.setRight(cartList);
+        borderPane.setCenter(cartList);
         borderPane.setBottom(bottomBox);
-        
-        cartList.setPrefWidth(650);
-        leftVBox.setPrefWidth(400);
-        centerVBox.setPrefWidth(150);
-        primaryStage.setScene(new Scene(borderPane, 1200, 600));
+
+        primaryStage.setScene(new Scene(borderPane, 900, 600));
         primaryStage.show();
     }
 
