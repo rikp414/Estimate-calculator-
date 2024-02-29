@@ -12,40 +12,31 @@ import javafx.print.PrinterJob;
 import javafx.scene.layout.VBox;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import javax.print.attribute.standard.MediaSizeName;
+import javax.print.attribute.standard.PrinterName;
+import javax.print.attribute.standard.PrinterResolution;
+import javax.print.attribute.standard.MediaSize;
+import javax.print.attribute.standard.MediaSizeName;
 
 import javafx.application.Platform;
 
 import javafx.geometry.Pos;
 
+import java.sql.*;
 import java.io.*;
 import java.util.Iterator;
 
-
-import javafx.print.PrinterJob;
-import javax.print.DocPrintJob;
-import javax.print.PrintService;
-import javax.print.SimpleDoc;
-import javax.print.attribute.HashPrintRequestAttributeSet;
-import javax.print.attribute.PrintRequestAttributeSet;
-import javax.print.attribute.standard.MediaSize;
-import javax.print.attribute.standard.MediaSizeName;
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-
-
-
-
 public class posjava extends Application {
 
-    private ListView<String> productList;
+    private ListView<Product> productList;
     private ListView<String> cartList;
     private Label totalLabel;
     private TextField searchTextField;
     private TextField productNameField;
     private TextField productPriceField;
 
-    private ObservableList<String> allProducts;
-    private String filePath = "C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\javapos\\gst_item_name.csv";
+    private ObservableList<Product> allProducts;
+    private String dbUrl = "jdbc:sqlite:C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\Estimateapp_db\\productsdb.db";
 
     public static void main(String[] args) {
         launch(args);
@@ -55,10 +46,10 @@ public class posjava extends Application {
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Retail POS System");
 
-        // Initialize product data from the "gst_item_name.csv" file
-        initializeProductData(filePath);
+        // Initialize product data from the database
+        initializeProductData(dbUrl);
 
-        productList = new ListView<>(allProducts);
+        productList = new ListView<>(FXCollections.observableArrayList(allProducts));
 
         // Shopping Cart
         cartList = new ListView<>();
@@ -81,7 +72,6 @@ public class posjava extends Application {
         // Quantity Spinner
         Spinner<Integer> quantitySpinner = new Spinner<>(1, Integer.MAX_VALUE, 1);
         quantitySpinner.setEditable(true); // Allow manual input
-        
 
         // Buttons
         Button addToCartButton = new Button("Add to Cart");
@@ -103,19 +93,19 @@ public class posjava extends Application {
         BorderPane borderPane = new BorderPane();
         HBox topBox = new HBox(searchTextField);
         searchTextField.setPrefWidth(400);
-        
+
         HBox leftButtons = new HBox(40, addNewProductButton, updateProductButton);
         HBox.setMargin(leftButtons, new Insets(20, 10, 15, 80));
         HBox rightButtons = new HBox(40, totalLabel, checkoutButton);
         HBox.setMargin(rightButtons, new Insets(20, 80, 15, 10));
-        rightButtons.setAlignment(Pos.CENTER_RIGHT); 
-        
+        rightButtons.setAlignment(Pos.CENTER_RIGHT);
+
         HBox bottomBox = new HBox(leftButtons, rightButtons);
         HBox.setHgrow(leftButtons, javafx.scene.layout.Priority.ALWAYS);
         bottomBox.setAlignment(Pos.CENTER_LEFT);
 
         // VBox for the left side with productList and searchTextField
-        VBox leftVBox = new VBox(productList, topBox);
+        VBox leftVBox = new VBox(topBox, productList);
         VBox centerVBox = new VBox(60, quantitySpinner, addToCartButton, removeButton);
         centerVBox.setAlignment(Pos.CENTER);
         leftVBox.setSpacing(10);
@@ -124,7 +114,7 @@ public class posjava extends Application {
         borderPane.setCenter(centerVBox);
         borderPane.setRight(cartList);
         borderPane.setBottom(bottomBox);
-        
+
         cartList.setPrefWidth(650);
         leftVBox.setPrefWidth(400);
         centerVBox.setPrefWidth(150);
@@ -132,32 +122,30 @@ public class posjava extends Application {
         primaryStage.show();
     }
 
-    private void initializeProductData(String filePath) {
+    private void initializeProductData(String dbUrl) {
         allProducts = FXCollections.observableArrayList();
 
-        try (BufferedReader br = new BufferedReader(new FileReader(new File(filePath)))) {
-            String line;
-            // Assuming the first line contains column headers
-            String[] headers = br.readLine().split(",");
-            int itemNameColumnIndex = findColumnIndex(headers, "item_name");
-            int priceColumnIndex = findColumnIndex(headers, "price");
+        try (Connection connection = DriverManager.getConnection(dbUrl);
+             Statement statement = connection.createStatement()) {
 
-            while ((line = br.readLine()) != null) {
-                String[] values = line.split(",");
-                if (itemNameColumnIndex >= 0 && itemNameColumnIndex < values.length) {
-                    String productName = values[itemNameColumnIndex].trim();
-                    // Assuming the second column is for prices
-                    String productPrice = (priceColumnIndex >= 0 && priceColumnIndex < values.length) ? values[priceColumnIndex].trim() : "0.00";
-                    // Print the product name and price for debugging
-                    System.out.println("Product Name: " + productName + ", Price: " + productPrice);
-                    allProducts.add(productName + " - Rs " + productPrice);
-                }
+            // Create products table if not exists
+            statement.execute("CREATE TABLE IF NOT EXISTS products_3 (item_name TEXT, price REAL)");
+
+            ResultSet resultSet = statement.executeQuery("SELECT item_name, price FROM products_3");
+
+            while (resultSet.next()) {
+                String productName = resultSet.getString("item_name").trim();
+                double productPrice = resultSet.getDouble("price");
+
+                System.out.println("Product Name: " + productName + ", Price: " + productPrice);
+                allProducts.add(new Product(productName, productPrice));
             }
-        } catch (IOException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
-            // Handle file reading exception
+            // Handle database exception
         }
     }
+
 
     private int findColumnIndex(String[] headers, String columnName) {
         for (int i = 0; i < headers.length; i++) {
@@ -169,29 +157,33 @@ public class posjava extends Application {
     }
 
     private void searchProduct(String keyword) {
-        ObservableList<String> filteredProducts = allProducts.filtered(product -> product.toLowerCase().contains(keyword.toLowerCase()));
+        ObservableList<Product> filteredProducts = allProducts.filtered(product ->
+                product.getName().toLowerCase().contains(keyword.toLowerCase()));
         productList.setItems(filteredProducts);
     }
 
     private void addToCart(int quantity) {
-        String selectedProduct = productList.getSelectionModel().getSelectedItem();
+        Product selectedProduct = productList.getSelectionModel().getSelectedItem();
         if (selectedProduct != null) {
             // Extract product name and price
-            String productName = selectedProduct.split(" - ")[0];
-            double productPrice = Double.parseDouble(selectedProduct.split(" - ")[1].replace("Rs ", "").trim());
+            String productName = selectedProduct.getName();
+            double productPrice = selectedProduct.getPrice();
 
             // Calculate total for the item based on quantity and price
             double totalForItem = quantity * productPrice;
 
             // Calculate the maximum product name length
-            int maxProductNameLength = allProducts.stream().mapToInt(p -> p.split(" - ")[0].length()).max().orElse(0);
+            int maxProductNameLength = allProducts.stream()
+                    .mapToInt(p -> p.getName().length())
+                    .max()
+                    .orElse(0);
 
             // Calculate available space for price*quantity
             int availableSpace = 50;  // Adjust this value based on your requirement
             int spaceForPriceQuantity = Math.max(availableSpace - maxProductNameLength, 0);
 
             // Format the strings to ensure equal space between product name and price
-            String formattedProductName = String.format("%-" + (maxProductNameLength +spaceForPriceQuantity + 10) + "s", productName);
+            String formattedProductName = String.format("%-" + (maxProductNameLength + spaceForPriceQuantity + 10) + "s", productName);
             String formattedPrice = String.format("%-" + spaceForPriceQuantity + "s", "Rs " + String.format("%.2f", productPrice));
             String formattedQuantity = String.format("%1d", quantity);
             String formattedTotal = String.format("%12s", "Rs " + String.format("%.2f", totalForItem));
@@ -204,6 +196,34 @@ public class posjava extends Application {
         }
     }
 
+
+    private class Product {
+        private String name;
+        private double price;
+        
+        
+        public void setPrice(double price) {
+            this.price = price;
+        }
+
+        public Product(String name, double price) {
+            this.name = name;
+            this.price = price;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public double getPrice() {
+            return price;
+        }
+
+        @Override
+        public String toString() {
+            return name + " - Rs " + String.format("%.2f", price);
+        }
+    }
 
     private void removeFromCart() {
         String selectedItem = cartList.getSelectionModel().getSelectedItem();
@@ -255,16 +275,16 @@ public class posjava extends Application {
 
         // Add more empty lines for additional space
         receiptText.append("\n\n\n\n\n\n\n\n\n\n");
-        
+
         receiptText.insert(0, "Manish Electronics Estimate\nDate: " + formattedDate + "\n\n");
-       
+
         TextArea receiptTextArea = new TextArea(receiptText.toString());
         receiptTextArea.setEditable(false);
         receiptTextArea.setWrapText(true);
         receiptTextArea.setMaxWidth(600);
         receiptTextArea.setMaxHeight(300);
 
-        printReceipt(receiptTextArea.getText());
+        printReceipt(receiptTextArea.getText()); // Call printReceipt method here
 
         cartList.getItems().clear();
         updateTotal();
@@ -280,9 +300,6 @@ public class posjava extends Application {
 
         PrinterUtils.print(receiptText, a8MediaSize, printerName);
     }
-
-
-    
 
     private void showAlert(String title, String content) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -305,13 +322,23 @@ public class posjava extends Application {
         Button addButton = new Button("Add");
         addButton.setOnAction(e -> {
             String name = newNameField.getText().trim();
-            String price = newPriceField.getText().trim();
+            String priceText = newPriceField.getText().trim();
 
-            if (!name.isEmpty() && !price.isEmpty()) {
-                allProducts.add(name + " - Rs " + price);
-                showAlert("Success", "Product added: " + name);
-                newProductStage.close();
-                saveProductDataToFile(filePath); // Save the new product to the file
+            if (!name.isEmpty() && !priceText.isEmpty()) {
+                try {
+                    double price = Double.parseDouble(priceText);
+                    Product newProduct = new Product(name, price);
+                    allProducts.add(newProduct);
+                    showAlert("Success", "Product added: " + newProduct.getName());
+                    newProductStage.close();
+                    saveProductDataToDatabase(dbUrl); // Save the new product to the database
+                } catch (NumberFormatException ex) {
+                    showAlert("Error", "Please enter a valid numeric price.");
+                } catch (Exception ex) {
+                    showAlert("Error", "An error occurred while adding the product to the database.");
+                    ex.printStackTrace();
+                    System.err.println("Error details: " + ex.getMessage());
+                }
             } else {
                 showAlert("Error", "Please enter product name and price.");
             }
@@ -325,13 +352,15 @@ public class posjava extends Application {
         newProductStage.show();
     }
 
+
+
     private void openUpdateProductWindow() {
-        String selectedProduct = productList.getSelectionModel().getSelectedItem();
+        Product selectedProduct = productList.getSelectionModel().getSelectedItem();
         if (selectedProduct != null) {
             Stage updateProductStage = new Stage();
             updateProductStage.setTitle("Update Product");
 
-            Label selectedProductLabel = new Label("Selected Product: " + selectedProduct);
+            Label selectedProductLabel = new Label("Selected Product: " + selectedProduct.getName());
 
             Label priceLabel = new Label("New Product Price:");
             TextField newPriceField = new TextField();
@@ -341,28 +370,24 @@ public class posjava extends Application {
                 String updatedPrice = newPriceField.getCharacters().toString().trim();
 
                 if (!updatedPrice.isEmpty()) {
-                    int selectedIndex = productList.getSelectionModel().getSelectedIndex();
-                    String productName = selectedProduct.split(" - ")[0];
-                    String updatedProduct = productName + " - Rs " + updatedPrice;
+                    try {
+                        double newPrice = Double.parseDouble(updatedPrice);
+                        selectedProduct.setPrice(newPrice);
 
-                    // Update the existing product in the allProducts list
-                    for (int i = 0; i < allProducts.size(); i++) {
-                        if (allProducts.get(i).startsWith(productName)) {
-                            allProducts.set(i, updatedProduct);
-                            break;
-                        }
+                        // Update the GUI on the JavaFX Application Thread
+                        Platform.runLater(() -> {
+                            productList.setItems(FXCollections.observableArrayList(allProducts));
+                            productList.getSelectionModel().select(selectedProduct);
+                        });
+
+                        showAlert("Success", "Product updated: " + selectedProduct.getName() +
+                                " with price: Rs " + updatedPrice);
+                        updateProductStage.close();
+
+                        saveProductDataToDatabase(dbUrl); // Save the updated product to the database
+                    } catch (NumberFormatException ex) {
+                        showAlert("Error", "Please enter a valid numeric price.");
                     }
-
-                    // Update the GUI on the JavaFX Application Thread
-                    Platform.runLater(() -> {
-                        productList.setItems(FXCollections.observableArrayList(allProducts));
-                        productList.getSelectionModel().select(selectedIndex);
-                    });
-
-                    showAlert("Success", "Product updated: " + selectedProduct + " with price: Rs " + updatedPrice);
-                    updateProductStage.close();
-
-                    saveProductDataToFile(filePath); // Save the updated product to the file
                 } else {
                     showAlert("Error", "Please enter the new price.");
                 }
@@ -380,23 +405,37 @@ public class posjava extends Application {
     }
 
 
+    private void saveProductDataToDatabase(String dbUrl) {
+        try (Connection connection = DriverManager.getConnection(dbUrl);
+             Statement statement = connection.createStatement()) {
 
-    private void saveProductDataToFile(String filePath) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)))) {
-            // Write headers
-            writer.write("item_name,price\n");
+            // Create products table if not exists
+            statement.execute("CREATE TABLE IF NOT EXISTS products_3 (item_name TEXT, price REAL)");
 
-            // Write product data
-            for (String product : allProducts) {
-                String productName = product.split(" - ")[0];
-                String productPrice = product.split(" - ")[1].replace("Rs ", "");
+            // Clear existing data
+            statement.execute("DELETE FROM products_3");
 
-                writer.write(productName + "," + String.format("%.2f", Double.parseDouble(productPrice)) + "\n");
+            // Insert product data using PreparedStatement
+            String insertQuery = "INSERT INTO products_3 (item_name, price) VALUES (?, ?)";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(insertQuery)) {
+                for (Product product : allProducts) {
+                    String productName = product.getName();
+                    double productPrice = product.getPrice();
+
+                    preparedStatement.setString(1, productName);
+                    preparedStatement.setDouble(2, productPrice);
+                    preparedStatement.executeUpdate();
+                }
             }
 
-            System.out.println("Product data saved to file: " + filePath);
-        } catch (IOException e) {
+            System.out.println("Product data saved to database: " + dbUrl);
+        } catch (SQLException e) {
             e.printStackTrace();
+            // Handle database exception
+            System.err.println("Error details: " + e.getMessage());
         }
     }
+
+
+
 }
