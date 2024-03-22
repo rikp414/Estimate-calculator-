@@ -21,7 +21,13 @@ import javax.print.attribute.standard.MediaSizeName;
 import javafx.application.Platform;
 
 import javafx.geometry.Pos;
-
+import java.sql.SQLException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.*;
 import java.io.*;
 import java.util.Iterator;
@@ -121,7 +127,29 @@ public class posjava extends Application {
         primaryStage.setScene(new Scene(borderPane, 1200, 600));
         primaryStage.show();
     }
+    
+    // Define the method to update product price in the database
+    private void updateProductPriceInDatabase(String productName, double newPrice) throws SQLException {
+        // Define your database URL
+        String dbUrl = "jdbc:sqlite:C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\Estimateapp_db\\productsdb.db";
 
+        // Define your SQL update statement
+        String updateQuery = "UPDATE products_3 SET price = ? WHERE item_name = ?";
+
+        try (Connection connection = DriverManager.getConnection(dbUrl);
+             PreparedStatement preparedStatement = connection.prepareStatement(updateQuery)) {
+
+            // Set parameters for the PreparedStatement
+            preparedStatement.setDouble(1, newPrice);
+            preparedStatement.setString(2, productName);
+
+            // Execute the update statement
+            preparedStatement.executeUpdate();
+
+            System.out.println("Product price updated in the database: " + productName + ", New Price: " + newPrice);
+        }
+    }
+    
     private void initializeProductData(String dbUrl) {
         allProducts = FXCollections.observableArrayList();
 
@@ -327,17 +355,34 @@ public class posjava extends Application {
             if (!name.isEmpty() && !priceText.isEmpty()) {
                 try {
                     double price = Double.parseDouble(priceText);
-                    Product newProduct = new Product(name, price);
-                    allProducts.add(newProduct);
-                    showAlert("Success", "Product added: " + newProduct.getName());
-                    newProductStage.close();
-                    saveProductDataToDatabase(dbUrl); // Save the new product to the database
+
+                    // Perform database insertion in a background thread
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+                    executor.submit(() -> {
+                        try {
+                            // Create a new product instance
+                            Product newProduct = new Product(name, price);
+
+                            // Update the GUI on the JavaFX Application Thread
+                            Platform.runLater(() -> {
+                                allProducts.add(newProduct);
+                                showAlert("Success", "Product added: " + newProduct.getName());
+                                newProductStage.close();
+                            });
+
+                            // Save the new product to the database
+                            saveProductDataToDatabase(dbUrl);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                            showAlert("Error", "An error occurred while adding the product to the database.");
+                        }
+                    });
+
+                    // Shutdown the executor after completion
+                    executor.shutdown();
+
                 } catch (NumberFormatException ex) {
                     showAlert("Error", "Please enter a valid numeric price.");
-                } catch (Exception ex) {
-                    showAlert("Error", "An error occurred while adding the product to the database.");
-                    ex.printStackTrace();
-                    System.err.println("Error details: " + ex.getMessage());
                 }
             } else {
                 showAlert("Error", "Please enter product name and price.");
@@ -351,6 +396,7 @@ public class posjava extends Application {
         newProductStage.setScene(scene);
         newProductStage.show();
     }
+
 
 
 
@@ -372,19 +418,39 @@ public class posjava extends Application {
                 if (!updatedPrice.isEmpty()) {
                     try {
                         double newPrice = Double.parseDouble(updatedPrice);
-                        selectedProduct.setPrice(newPrice);
 
-                        // Update the GUI on the JavaFX Application Thread
-                        Platform.runLater(() -> {
-                            productList.setItems(FXCollections.observableArrayList(allProducts));
-                            productList.getSelectionModel().select(selectedProduct);
+                        // Perform database update in a background thread
+                        ExecutorService executor = Executors.newSingleThreadExecutor();
+                        executor.submit(() -> {
+                            try {
+                                // Update the product price in the database
+                                updateProductPriceInDatabase(selectedProduct.getName(), newPrice);
+
+                                // Update the product price locally
+                                selectedProduct.setPrice(newPrice);
+
+                                // Update the GUI on the JavaFX Application Thread
+                                Platform.runLater(() -> {
+                                    int selectedIndex = productList.getSelectionModel().getSelectedIndex();
+                                    ObservableList<Product> updatedProducts = FXCollections.observableArrayList(productList.getItems());
+                                    updatedProducts.set(selectedIndex, selectedProduct);
+                                    productList.setItems(updatedProducts);
+
+
+                                    showAlert("Success", "Product updated: " + selectedProduct.getName() +
+                                            " with price: Rs " + updatedPrice);
+                                    updateProductStage.close();
+                                });
+                            } catch (SQLException ex) {
+                                // Handle database update error
+                                ex.printStackTrace();
+                                showAlert("Error", "An error occurred while updating the product price in the database.");
+                            }
                         });
 
-                        showAlert("Success", "Product updated: " + selectedProduct.getName() +
-                                " with price: Rs " + updatedPrice);
-                        updateProductStage.close();
+                        // Shutdown the executor after completion
+                        executor.shutdown();
 
-                        saveProductDataToDatabase(dbUrl); // Save the updated product to the database
                     } catch (NumberFormatException ex) {
                         showAlert("Error", "Please enter a valid numeric price.");
                     }
@@ -403,6 +469,7 @@ public class posjava extends Application {
             showAlert("Error", "Please select a product to update.");
         }
     }
+
 
 
     private void saveProductDataToDatabase(String dbUrl) {
