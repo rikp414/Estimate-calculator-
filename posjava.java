@@ -12,7 +12,8 @@ import javafx.print.PrinterJob;
 import javafx.scene.layout.VBox;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.application.Platform;
 
 
@@ -30,6 +31,7 @@ import javax.print.attribute.standard.MediaSize;
 import javax.print.attribute.standard.MediaSizeName;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import javafx.geometry.Pos;
 
 
 
@@ -58,29 +60,36 @@ public class posjava extends Application {
         initializeProductData(filePath);
 
         productList = new ListView<>(allProducts);
+        productList.setStyle("-fx-font-size: 16;"); // Set font size to 16
 
         // Shopping Cart
         cartList = new ListView<>();
+        cartList.setStyle("-fx-font-size: 16;"); // Set font size to 16
 
         // Total Label
         totalLabel = new Label("Total: Rs 0.00");
+        totalLabel.setFont(Font.font("System", FontWeight.BOLD, 16)); // Set font to bold and size to 16
 
         // Search TextField
         searchTextField = new TextField();
         searchTextField.setPromptText("Search Product");
+        searchTextField.setFont(new Font(16)); // Set font size to 16
         searchTextField.textProperty().addListener((observable, oldValue, newValue) -> searchProduct(newValue));
 
         // Product Name and Price TextFields
         productNameField = new TextField();
         productNameField.setPromptText("Product Name");
+        productNameField.setFont(new Font(16)); // Set font size to 16
 
         productPriceField = new TextField();
         productPriceField.setPromptText("Product Price");
+        productPriceField.setFont(new Font(16)); // Set font size to 16
 
         // Quantity Spinner
         Spinner<Integer> quantitySpinner = new Spinner<>(1, Integer.MAX_VALUE, 1);
         quantitySpinner.setEditable(true); // Allow manual input
-
+        quantitySpinner.setStyle("-fx-font-size: 16;"); // Set font size to 16
+        
         // Buttons
         Button addToCartButton = new Button("Add to Cart");
         addToCartButton.setOnAction(e -> addToCart(quantitySpinner.getValue())); // Pass quantity to addToCart method
@@ -95,23 +104,39 @@ public class posjava extends Application {
         updateProductButton.setOnAction(e -> openUpdateProductWindow());
 
         Button checkoutButton = new Button("Checkout");
+        checkoutButton.setFont(new Font(16)); // Set font size to 16
         checkoutButton.setOnAction(e -> checkout());
 
         // Layout
         BorderPane borderPane = new BorderPane();
-        HBox topBox = new HBox(searchTextField, quantitySpinner);
-        HBox bottomBox = new HBox(10, addToCartButton, removeButton, addNewProductButton, updateProductButton, checkoutButton, totalLabel);
-        bottomBox.setPadding(new Insets(10));
+        HBox topBox = new HBox(searchTextField);
+        searchTextField.setPrefWidth(400);
+        
+        HBox leftButtons = new HBox(40, addNewProductButton, updateProductButton);
+        HBox.setMargin(leftButtons, new Insets(20, 10, 15, 80));
+        HBox rightButtons = new HBox(40, totalLabel, checkoutButton);
+        HBox.setMargin(rightButtons, new Insets(20, 80, 15, 10));
+        rightButtons.setAlignment(Pos.CENTER_RIGHT); 
+        
+        HBox bottomBox = new HBox(leftButtons, rightButtons);
+        HBox.setHgrow(leftButtons, javafx.scene.layout.Priority.ALWAYS);
+        bottomBox.setAlignment(Pos.CENTER_LEFT);
 
         // VBox for the left side with productList and searchTextField
         VBox leftVBox = new VBox(productList, topBox);
+        VBox centerVBox = new VBox(60, quantitySpinner, addToCartButton, removeButton);
+        centerVBox.setAlignment(Pos.CENTER);
         leftVBox.setSpacing(10);
 
         borderPane.setLeft(leftVBox);
-        borderPane.setCenter(cartList);
+        borderPane.setCenter(centerVBox);
+        borderPane.setRight(cartList);
         borderPane.setBottom(bottomBox);
-
-        primaryStage.setScene(new Scene(borderPane, 900, 600));
+        
+        cartList.setPrefWidth(650);
+        leftVBox.setPrefWidth(400);
+        centerVBox.setPrefWidth(150);
+        primaryStage.setScene(new Scene(borderPane, 1200, 600));
         primaryStage.show();
     }
 
@@ -236,11 +261,13 @@ public class posjava extends Application {
         // Append total at the bottom right corner
         receiptText.append("\n\nTotal: Rs ").append(String.format("%.2f", total)).append("\n");
 
-        // Add more empty lines for additional space
-        receiptText.append("\n\n\n\n\n\n\n\n\n\n");
         
-        receiptText.insert(0, "Manish Electronics Estimate\nDate: " + formattedDate + "\n\n");
+        
+        receiptText.insert(0, "Manish Electronics Estimate Bill\nDate: " + formattedDate + "\n***********************************************\n----------------------------------------------\nItem_Name      Price * Quantity      Total \n--------------------------------------------\n\n\n");
        
+        // Add more empty lines for additional space
+        receiptText.append("\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        
         TextArea receiptTextArea = new TextArea(receiptText.toString());
         receiptTextArea.setEditable(false);
         receiptTextArea.setWrapText(true);
