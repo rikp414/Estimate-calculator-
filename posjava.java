@@ -15,6 +15,9 @@ import java.time.format.DateTimeFormatter;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.application.Platform;
+import javafx.util.StringConverter;
+import java.text.DecimalFormat;
+
 
 import java.io.*;
 import java.util.Iterator;
@@ -33,6 +36,8 @@ import java.io.InputStream;
 import javafx.geometry.Pos;
 
 
+
+
 public class posjava extends Application {
 
     private ListView<String> productList;
@@ -43,10 +48,7 @@ public class posjava extends Application {
     private TextField productPriceField;
 
     private ObservableList<String> allProducts;
-    private ObservableList<String> transactionHistory; // Store transaction history
-
-    private String filePath = "C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\javapos\\gst_item_name.csv";
-    private String historyFilePath = "C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\javapos\\transaction_history.csv";
+    private String filePath = "D:\\java software\\TEST1\\gst_item_name_dub.csv";
 
     public static void main(String[] args) {
         launch(args);
@@ -58,9 +60,6 @@ public class posjava extends Application {
 
         // Initialize product data from the "gst_item_name.csv" file
         initializeProductData(filePath);
-
-        // Initialize transaction history from the history file
-        initializeTransactionHistory();
 
         productList = new ListView<>(allProducts);
         productList.setStyle("-fx-font-size: 16;"); // Set font size to 16
@@ -89,13 +88,36 @@ public class posjava extends Application {
         productPriceField.setFont(new Font(16)); // Set font size to 16
 
         // Quantity Spinner
-        Spinner<Integer> quantitySpinner = new Spinner<>(1, Integer.MAX_VALUE, 1);
+        Spinner<Double> quantitySpinner = new Spinner<>(1.0, Double.MAX_VALUE, 1.0, 1.0); // Changed to Spinner<Double> and adjusted values
         quantitySpinner.setEditable(true); // Allow manual input
         quantitySpinner.setStyle("-fx-font-size: 16;"); // Set font size to 16
         
+        // Customize the editor to allow only half values
+        DecimalFormat format = new DecimalFormat("#.##");
+        StringConverter<Double> converter = new StringConverter<Double>() {
+            @Override
+            public String toString(Double object) {
+                return format.format(object);
+            }
+
+            @Override
+            public Double fromString(String string) {
+                try {
+                    // Only allow half values
+                    double value = Double.parseDouble(string);
+                    return Math.floor(value) + (value % 1 == 0.5 ? 0.5 : 0);
+                } catch (NumberFormatException e) {
+                    return quantitySpinner.getValue(); // Revert to the previous value
+                }
+            }
+        };
+        quantitySpinner.getValueFactory().setConverter(converter);
+        
         // Buttons
         Button addToCartButton = new Button("Add to Cart");
-        addToCartButton.setOnAction(e -> addToCart(quantitySpinner.getValue())); // Pass quantity to addToCart method
+        addToCartButton.setOnAction(e -> {double quantity = quantitySpinner.getValue();
+        addToCart(quantity);
+    });
 
         Button removeButton = new Button("Remove from Cart");
         removeButton.setOnAction(e -> removeFromCart());
@@ -110,16 +132,12 @@ public class posjava extends Application {
         checkoutButton.setFont(new Font(16)); // Set font size to 16
         checkoutButton.setOnAction(e -> checkout());
 
-        // History Button
-        Button historyButton = new Button("History");
-        historyButton.setOnAction(e -> showTransactionHistory());
-
         // Layout
         BorderPane borderPane = new BorderPane();
         HBox topBox = new HBox(searchTextField);
         searchTextField.setPrefWidth(400);
         
-        HBox leftButtons = new HBox(40, addNewProductButton, updateProductButton, historyButton);
+        HBox leftButtons = new HBox(40, addNewProductButton, updateProductButton);
         HBox.setMargin(leftButtons, new Insets(20, 10, 15, 80));
         HBox rightButtons = new HBox(40, totalLabel, checkoutButton);
         HBox.setMargin(rightButtons, new Insets(20, 80, 15, 10));
@@ -174,20 +192,6 @@ public class posjava extends Application {
         }
     }
 
-    private void initializeTransactionHistory() {
-        transactionHistory = FXCollections.observableArrayList();
-
-        try (BufferedReader br = new BufferedReader(new FileReader(new File(historyFilePath)))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                transactionHistory.add(line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            // Handle file reading exception
-        }
-    }
-
     private int findColumnIndex(String[] headers, String columnName) {
         for (int i = 0; i < headers.length; i++) {
             if (columnName.equals(headers[i].trim())) {
@@ -202,7 +206,7 @@ public class posjava extends Application {
         productList.setItems(filteredProducts);
     }
 
-    private void addToCart(int quantity) {
+    private void addToCart(double quantity) {
         String selectedProduct = productList.getSelectionModel().getSelectedItem();
         if (selectedProduct != null) {
             // Extract product name and price
@@ -222,7 +226,7 @@ public class posjava extends Application {
             // Format the strings to ensure equal space between product name and price
             String formattedProductName = String.format("%-" + (maxProductNameLength +spaceForPriceQuantity + 10) + "s", productName);
             String formattedPrice = String.format("%-" + spaceForPriceQuantity + "s", "Rs " + String.format("%.2f", productPrice));
-            String formattedQuantity = String.format("%1d", quantity);
+            String formattedQuantity = String.format("%1.1f", quantity);
             String formattedTotal = String.format("%12s", "Rs " + String.format("%.2f", totalForItem));
             String formattedProduct = formattedProductName + formattedPrice + " x " + formattedQuantity + " = " + formattedTotal;
 
@@ -282,14 +286,13 @@ public class posjava extends Application {
         // Append total at the bottom right corner
         receiptText.append("\n\nTotal: Rs ").append(String.format("%.2f", total)).append("\n");
 
+        
+        
         receiptText.insert(0, "Manish Electronics Estimate Bill\nDate: " + formattedDate + "\n***********************************************\n----------------------------------------------\nItem_Name      Price * Quantity      Total \n--------------------------------------------\n\n\n");
-
-        // Store transaction in history
-        transactionHistory.add(receiptText.toString());
-
-        // Save transaction history to file
-        saveTransactionHistory();
-
+       
+        // Add more empty lines for additional space
+        receiptText.append("\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        
         TextArea receiptTextArea = new TextArea(receiptText.toString());
         receiptTextArea.setEditable(false);
         receiptTextArea.setWrapText(true);
@@ -302,15 +305,6 @@ public class posjava extends Application {
         updateTotal();
     }
 
-    private void saveTransactionHistory() {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(historyFilePath)))) {
-            for (String transaction : transactionHistory) {
-                writer.write(transaction +"-----------------------------------------------------------------------------------------------" +"\n\n\n\n\n\n\n");
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     private void printReceipt(String receiptText) {
         // Use MediaSizeName to specify the paper size
@@ -322,28 +316,8 @@ public class posjava extends Application {
         PrinterUtils.print(receiptText, a8MediaSize, printerName);
     }
 
-    private void showTransactionHistory() {
-        StringBuilder historyText = new StringBuilder("Transaction History:\n");
-        for (String transaction : transactionHistory) {
-            historyText.append(transaction).append("\n");
-        }
 
-        TextArea historyTextArea = new TextArea(historyText.toString());
-        historyTextArea.setEditable(false);
-        historyTextArea.setWrapText(true);
-        historyTextArea.setMaxWidth(Double.MAX_VALUE);
-        historyTextArea.setMaxHeight(Double.MAX_VALUE);
-
-        VBox historyVBox = new VBox(historyTextArea);
-        VBox.setVgrow(historyTextArea, Priority.ALWAYS);
-
-        Stage historyStage = new Stage();
-        historyStage.setTitle("Transaction History");
-        Scene scene = new Scene(historyVBox, 800, 600); // Adjust the width and height as needed
-        historyStage.setScene(scene);
-        historyStage.show();
-    }
-
+    
 
     private void showAlert(String title, String content) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -439,6 +413,8 @@ public class posjava extends Application {
             showAlert("Error", "Please select a product to update.");
         }
     }
+
+
 
     private void saveProductDataToFile(String filePath) {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(filePath)))) {
