@@ -50,7 +50,7 @@ public class posjava extends Application {
     private TextField productPriceField;
     private TextField customerNameField;
     private ObservableList<String> allProducts;
-    private String filePath = "C:\\Users\\patel\\OneDrive\\Documents\\work\\Java_learning\\javapos\\gst_item_name_dup.csv";
+    private String filePath = "D:\\java software\\TEST1\\gst_item_name_dub.csv";
 
     public static void main(String[] args) {
         launch(args);
@@ -272,13 +272,16 @@ public class posjava extends Application {
         // Get the current date and time
         LocalDateTime currentDateTime = LocalDateTime.now();
 
-        // Format the date and time
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-        String formattedDateTime = currentDateTime.format(dateTimeFormatter);
+        // Format the date
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        String formattedDate = currentDateTime.format(dateFormatter);
 
-        // Split the formatted date and time to separate variables
-        String formattedDate = formattedDateTime.split(" ")[0];
-        String formattedTime = formattedDateTime.split(" ")[1];
+        // Format the time
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+        String formattedTime = currentDateTime.format(timeFormatter);
+
+        // Retrieve customer name when checkout button is clicked
+        String customerName = customerNameField.getText().trim();
 
         StringBuilder receiptText = new StringBuilder();
         double total = 0.0; // Initialize total
@@ -290,28 +293,25 @@ public class posjava extends Application {
 
         int itemNumber = 1; // Number for the first item
 
+        receiptText.append("Manish Electronics Estimate Bill\nDate: ").append(formattedDate).append(" ").append(formattedTime).append("\n\n");
+        // Append customer name to the receipt
+        if (!customerName.isEmpty()) {
+            receiptText.append("Customer Name: ").append(customerName).append("\n\n\n");
+        }
+        receiptText.append("----------------------------------------------\n");
+        receiptText.append("Item_Name      Price * Quantity      Total \n");
+        receiptText.append("--------------------------------------------\n");
+
         for (String item : cartList.getItems()) {
-            receiptText.append(itemNumber).append(". ").append(item).append("\n");
+            receiptText.append(itemNumber).append(". ").append(item).append("\n\n");
             itemNumber++;
         }
 
         // Append total at the bottom right corner
         receiptText.append("\n\nTotal: Rs ").append(String.format("%.2f", total)).append("\n");
 
-        receiptText.insert(0, "Manish Electronics Estimate Bill\nDate: " + formattedDate + " " + formattedTime + "\n");
-
-        // Retrieve customer name when checkout button is clicked
-        String customerName = customerNameField.getText().trim();
-
-        // Append customer name to the receipt
-        if (!customerName.isEmpty()) {
-            receiptText.append("Customer Name: ").append(customerName).append("\n");
-        }
-
-        receiptText.append("***********************************************\n");
-        receiptText.append("----------------------------------------------\n");
-        receiptText.append("Item_Name          Price * Quantity      Total \n");
-        receiptText.append("----------------------------------------------\n\n\n");
+        // Add more empty lines for additional space
+        receiptText.append("\n\n\n\n\n\n\n\n\n\n\n\n\n");
 
         TextArea receiptTextArea = new TextArea(receiptText.toString());
         receiptTextArea.setEditable(false);
@@ -321,11 +321,14 @@ public class posjava extends Application {
 
         printReceipt(receiptTextArea.getText());
 
-        // Clear cart and customer name field, and update total
         cartList.getItems().clear();
         customerNameField.clear();
         updateTotal();
     }
+
+
+
+
 
 
 
