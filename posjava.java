@@ -133,6 +133,9 @@ public class posjava extends Application {
 
         Button updateProductButton = new Button("Update Product");
         updateProductButton.setOnAction(e -> openUpdateProductWindow());
+        
+        Button clearcart = new Button("Clear Cart");
+        clearcart.setOnAction(e -> clearcartarea());
 
         Button checkoutButton = new Button("Checkout");
         checkoutButton.setFont(new Font(16)); // Set font size to 16
@@ -155,7 +158,7 @@ public class posjava extends Application {
 
         // VBox for the left side with productList and searchTextField
         VBox leftVBox = new VBox(topBox, productList);
-        VBox rightVBox = new VBox(customerNameField, cartList);
+        VBox rightVBox = new VBox(customerNameField, cartList,clearcart);
         VBox centerVBox = new VBox(60, quantitySpinner, addToCartButton, removeButton);
         centerVBox.setAlignment(Pos.CENTER);
         leftVBox.setSpacing(10);
@@ -321,12 +324,13 @@ public class posjava extends Application {
 
         printReceipt(receiptTextArea.getText());
 
-        cartList.getItems().clear();
-        customerNameField.clear();
         updateTotal();
     }
 
-
+    private void clearcartarea(){
+        cartList.getItems().clear();
+        customerNameField.clear();
+    }
 
 
 
